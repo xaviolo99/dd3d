@@ -1,0 +1,9 @@
+FOLLOW INSTRUCTIONS IN README.
+
+PUT THE DATASETS INSIDE ./datasets FOLDER.
+CREATE ./models/ FOLDER WITH ALL WANTED MODELS FROM GITHUB.
+
+RUN EXPERIMENTS:
+python ./scripts/train.py +experiments=dd3d_kitti_v99 EVAL_ONLY=True MODEL.CKPT=models/kitti_v99.pth TEST.IMS_PER_BATCH=4
+
+python ./scripts/visualize_dataloader.py +experiments=dd3d_kitti_v99 MODEL.CKPT=models/kitti_v99.pth

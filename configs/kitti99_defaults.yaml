@@ -9,6 +9,7 @@ defaults:
   - common/augmentation@INPUT
   - common/optimizer@SOLVER
   - common/test@TEST
+  - experiments: dd3d_kitti_v99
 
 WANDB:
   ENABLED: False
