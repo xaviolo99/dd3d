@@ -9,7 +9,7 @@ INPUT:
 
 MODEL:
   DEVICE: cuda
-  META_ARCHITECTURE: DD3D
+  META_ARCHITECTURE: DD3D #DD3DDenseDepth
 
   # Values to be used for image normalization (BGR order, since INPUT.FORMAT defaults to BGR).
   # To train on images of different number of channels, just set different mean & std.
@@ -24,4 +24,4 @@ MODEL:
 
   BOX2D_ON: True
   BOX3D_ON: True
-  DEPTH_ON: False
+  DEPTH_ON: False # True

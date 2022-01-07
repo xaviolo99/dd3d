@@ -166,7 +166,7 @@ def process_scene(model, input_dict, plot=False, log=False):
                   "front_upper_left": deepcopy(subd), "front_upper_right": deepcopy(subd),
                   "front_lower_right": deepcopy(subd), "front_lower_left": deepcopy(subd),
                   "back_upper_left": deepcopy(subd), "back_upper_right": deepcopy(subd),
-                  "back_lower_right": deepcopy(subd), "back_lower_left": deepcopy(subd)}
+                  "back_lower_right": deepcopy(subd), "back_lower_left": deepcopy(subd), "floor": deepcopy(subd)}
     for score_3d, kitti_class, box_3d in zipped:
         if score_3d < THRESHOLD:  # If the model is not confident enough, we skip the prediction
             continue
@@ -186,6 +186,13 @@ def process_scene(model, input_dict, plot=False, log=False):
         size = box_3d.size[0].cpu().numpy()  # width, length, height (meters)
         prediction["size"].append([round(e, 2) for e in size.tolist()])
 
+        floor_met = center_met + np.array([0, size[2]/2, 0])
+        floor_ang = meter_to_angle(*floor_met)
+        floor_pix = project_points3d(np.array([floor_met]), input_dict["intrinsics"].numpy())[0]
+        prediction["floor"]["pixels"].append([round(e, 1) for e in floor_pix.tolist()])
+        prediction["floor"]["meters"].append([round(e, 2) for e in floor_met.tolist()])
+        prediction["floor"]["degrees"].append([round(e, 2) for e in floor_ang.tolist()])
+
         corners_met = box_3d.corners[0].cpu().numpy()
         corners_ang = np.array([meter_to_angle(*corner) for corner in corners_met])
         corners_pix = project_points3d(corners_met, input_dict["intrinsics"].numpy())
@@ -198,8 +205,7 @@ def process_scene(model, input_dict, plot=False, log=False):
             prediction[key]["degrees"].append([round(e, 2) for e in ang.tolist()])
 
         w, l, h, x, y, z, roty, alpha = convert_3d_box_to_kitti(box_3d)
-        orientation = (
-                                  roty / np.pi * 180) + 90  # This orientation represents the horizontal car deviation from the street forward direction
+        orientation = - alpha / np.pi * 180  # The alpha in angles.png, clockwise is positive (180 to -180 range) (90 means we see car back) (-90 means we see car front)
         prediction["orientation"].append(round(orientation, 2))
 
         if log:
@@ -209,6 +215,9 @@ def process_scene(model, input_dict, plot=False, log=False):
             print(f"Center (meters): {center_met}")
             print(f"Center (degrees): {center_ang}")
             print(f"Size (meters): {size}")
+            print(f"Floor (pixels): {floor_pix}")
+            print(f"Floor (meters): {floor_met}")
+            print(f"Floor (degrees): {floor_ang}")
             print(f"Corners (pixels): {corners_pix}")
             print(f"Corners (meters): {corners_met}")
             print(f"Corners (degrees): {corners_ang}")
@@ -239,12 +248,20 @@ EXTRINSICS = {"wxyz": [1.0, 0.0, 0.0, 0.0], "tvec": [0.0, 0.0, 0.0]}
 MONGO_SESSION_ARGS = ("localhost", 27017)
 PREDICTION_KEYWORD = "kitti_cars"
 TIMEOUT = 180
+"""
 PROJECTIONS = [Projection(center_horizontal=0, center_vertical=0, fov_horizontal=92.5, fov_vertical=45.36,
                           full_resolution_x=1280, full_resolution_y=512,
                           offset_x=0, offset_y=512-384, resolution_x=1280, resolution_y=384),
                Projection(center_horizontal=180, center_vertical=0, fov_horizontal=92.5, fov_vertical=45.36,
                           full_resolution_x=1280, full_resolution_y=512,
                           offset_x=0, offset_y=512-384, resolution_x=1280, resolution_y=384)]
+"""
+PROJECTIONS = [Projection(center_horizontal=0, center_vertical=-1, fov_horizontal=82.6, fov_vertical=38.7,
+                          full_resolution_x=1280, full_resolution_y=384,
+                          offset_x=0, offset_y=0, resolution_x=1280, resolution_y=384),
+               Projection(center_horizontal=180, center_vertical=-1, fov_horizontal=82.6, fov_vertical=38.7,
+                          full_resolution_x=1280, full_resolution_y=384,
+                          offset_x=0, offset_y=0, resolution_x=1280, resolution_y=384)]  # 546.7
 MIN_LAT, MAX_LAT = 41.35, 41.5
 MIN_LON, MAX_LON = 2.1, 2.3
 PLOT = False
