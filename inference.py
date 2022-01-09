@@ -243,12 +243,13 @@ def process_scene(model, input_dict, plot=False, log=False):
 CFG_PATH = "configs/"
 CFG_NAME = "kitti99_defaults"
 CHECKPOINT = "models/kitti_v99.pth"
-INTRINSICS = [612.6, 0.0, 640.0, 0.0, 612.6, 128.0, 0.0, 0.0, 1.0]
-EXTRINSICS = {"wxyz": [1.0, 0.0, 0.0, 0.0], "tvec": [0.0, 0.0, 0.0]}
 MONGO_SESSION_ARGS = ("localhost", 27017)
 PREDICTION_KEYWORD = "kitti_cars"
 TIMEOUT = 180
+EXTRINSICS = {"wxyz": [1.0, 0.0, 0.0, 0.0], "tvec": [0.0, 0.0, 0.0]}
+# VERY IMPORTANT!!! https://stackoverflow.com/questions/39992968/how-to-calculate-field-of-view-of-the-camera-from-camera-intrinsic-matrix
 """
+INTRINSICS = [612.6, 0.0, 640.0, 0.0, 612.6, 128.0, 0.0, 0.0, 1.0]
 PROJECTIONS = [Projection(center_horizontal=0, center_vertical=0, fov_horizontal=92.5, fov_vertical=45.36,
                           full_resolution_x=1280, full_resolution_y=512,
                           offset_x=0, offset_y=512-384, resolution_x=1280, resolution_y=384),
@@ -256,12 +257,13 @@ PROJECTIONS = [Projection(center_horizontal=0, center_vertical=0, fov_horizontal
                           full_resolution_x=1280, full_resolution_y=512,
                           offset_x=0, offset_y=512-384, resolution_x=1280, resolution_y=384)]
 """
-PROJECTIONS = [Projection(center_horizontal=0, center_vertical=-1, fov_horizontal=82.6, fov_vertical=38.7,
-                          full_resolution_x=1280, full_resolution_y=384,
-                          offset_x=0, offset_y=0, resolution_x=1280, resolution_y=384),
-               Projection(center_horizontal=180, center_vertical=-1, fov_horizontal=82.6, fov_vertical=38.7,
-                          full_resolution_x=1280, full_resolution_y=384,
-                          offset_x=0, offset_y=0, resolution_x=1280, resolution_y=384)]  # 546.7
+INTRINSICS = [728.5, 0.0, 640.0, 0.0, 728.5, 112.0, 0.0, 0.0, 1.0]
+PROJECTIONS = [Projection(center_horizontal=0, center_vertical=-1, fov_horizontal=82.6, fov_vertical=40.95,
+                          full_resolution_x=1280, full_resolution_y=544,
+                          offset_x=0, offset_y=544-384, resolution_x=1280, resolution_y=384),
+               Projection(center_horizontal=180, center_vertical=-1, fov_horizontal=82.6, fov_vertical=40.95,
+                          full_resolution_x=1280, full_resolution_y=544,
+                          offset_x=0, offset_y=544-384, resolution_x=1280, resolution_y=384)] # 0.792 1685
 MIN_LAT, MAX_LAT = 41.35, 41.5
 MIN_LON, MAX_LON = 2.1, 2.3
 PLOT = False
