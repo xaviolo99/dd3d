@@ -53,7 +53,7 @@ class PanoramaDataset(Dataset):
             self.kluster = Kluster(session=MongoClient(*self.kluster))
         segment_id, line_idx, panorama_idx, panorama_id = self.panoramas[idx]
         panorama = self.kluster.kluster["street_view"].find_one({"_id": panorama_id})
-        shards = mongo_to_shards(panorama["panorama"])
+        shards = mongo_to_shards(panorama["image_shards"])
         panoramator = Panoramator(shards=shards, atomic_resolution=panorama["resolution"][0] // 16)
         panoramator.build_state()
         projections = [(projection_meta, panoramator.get_projection(projection_meta))
@@ -61,16 +61,17 @@ class PanoramaDataset(Dataset):
         return segment_id, line_idx, panorama_id, projections
 
 
-def inference(kluster, predictor, data_loader, keyword):
+def inference(kluster, predictor, data_loader, keyword, upload=True):
     current_line = None
     line_count = 0
+    itime = time.time()
 
     for i, (segment_id, line_idx, panorama_id, projections) in enumerate(data_loader):
-        itime = time.time()
 
         if current_line is not None and current_line != (segment_id, line_idx):
             sid, lidx = current_line
-            kluster.kluster["segments"].update_one({"_id": sid}, {"$set": {f"street_view.{lidx}.{keyword}": True}})
+            if upload:
+                kluster.kluster["segments"].update_one({"_id": sid}, {"$set": {f"street_view.{lidx}.{keyword}": True}})
             line_count += 1
             print(f"Finished line {line_count}! (Segment:{sid};Index:{lidx})")
         current_line = (segment_id, line_idx)
@@ -79,9 +80,19 @@ def inference(kluster, predictor, data_loader, keyword):
         for projection_meta, projection in projections:
             predictions = predictor(projection)
             result.append({"projection": projection_meta.get_dict(), **predictions})
-        kluster.kluster["street_view"].update_one({"_id": panorama_id}, {"$set": {keyword: result}})
+        if upload:
+            kluster.kluster["street_view"].update_one({"_id": panorama_id}, {"$set": {keyword: result}})
 
-        print(f"Predicted panorama {i+1}/{len(data_loader)} (Time elapsed: {time.time()-itime:.2f}s) ({panorama_id})")
+        print(f"Predicted panorama {i + 1}/{len(data_loader)} "
+              f"(Time elapsed: {time.time() - itime:.2f}s) ({panorama_id})")
+        itime = time.time()
+
+    if current_line is not None:
+        sid, lidx = current_line
+        if upload:
+            kluster.kluster["segments"].update_one({"_id": sid}, {"$set": {f"street_view.{lidx}.{keyword}": True}})
+        line_count += 1
+        print(f"Finished line {line_count}! (Segment:{sid};Index:{lidx})")
 
 
 # DD3D structures
@@ -246,17 +257,9 @@ CHECKPOINT = "models/kitti_v99.pth"
 MONGO_SESSION_ARGS = ("localhost", 27017)
 PREDICTION_KEYWORD = "kitti_cars"
 TIMEOUT = 180
+
 EXTRINSICS = {"wxyz": [1.0, 0.0, 0.0, 0.0], "tvec": [0.0, 0.0, 0.0]}
-# VERY IMPORTANT!!! https://stackoverflow.com/questions/39992968/how-to-calculate-field-of-view-of-the-camera-from-camera-intrinsic-matrix
-"""
-INTRINSICS = [612.6, 0.0, 640.0, 0.0, 612.6, 128.0, 0.0, 0.0, 1.0]
-PROJECTIONS = [Projection(center_horizontal=0, center_vertical=0, fov_horizontal=92.5, fov_vertical=45.36,
-                          full_resolution_x=1280, full_resolution_y=512,
-                          offset_x=0, offset_y=512-384, resolution_x=1280, resolution_y=384),
-               Projection(center_horizontal=180, center_vertical=0, fov_horizontal=92.5, fov_vertical=45.36,
-                          full_resolution_x=1280, full_resolution_y=512,
-                          offset_x=0, offset_y=512-384, resolution_x=1280, resolution_y=384)]
-"""
+# !!!!! stackoverflow.com/questions/39992968/how-to-calculate-field-of-view-of-the-camera-from-camera-intrinsic-matrix
 INTRINSICS = [728.5, 0.0, 640.0, 0.0, 728.5, 112.0, 0.0, 0.0, 1.0]
 PROJECTIONS = [Projection(center_horizontal=0, center_vertical=-1, fov_horizontal=82.6, fov_vertical=40.95,
                           full_resolution_x=1280, full_resolution_y=544,
@@ -268,6 +271,7 @@ MIN_LAT, MAX_LAT = 41.35, 41.5
 MIN_LON, MAX_LON = 2.1, 2.3
 PLOT = False
 LOG = False
+UPLOAD = True
 
 
 # Main Execution
@@ -299,7 +303,7 @@ if __name__ == "__main__":
         if len(dataset):
             print(f"LAUNCHING INFERENCE ON {len(dataset)} PANORAMAS")
             loader = DataLoader(dataset, batch_size=None, num_workers=4)
-            inference(main_kluster, dd3d_predictor, loader, PREDICTION_KEYWORD)
+            inference(main_kluster, dd3d_predictor, loader, PREDICTION_KEYWORD, upload=UPLOAD)
         else:
             print(f"NO PANORAMAS FOUND! WAITING {TIMEOUT} seconds...")
             time.sleep(180)
