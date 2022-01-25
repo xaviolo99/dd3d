@@ -43,6 +43,7 @@ class PanoramaDataset(Dataset):
         ]
         self.panoramas = [(sid, lidx, pidx, panorama)
                           for sid, lidx, panoramas in lines for pidx, panorama in enumerate(panoramas)]
+        self.keyword = keyword
         self.projections = projections
 
     def __len__(self):
@@ -53,6 +54,8 @@ class PanoramaDataset(Dataset):
             self.kluster = Kluster(session=MongoClient(*self.kluster))
         segment_id, line_idx, panorama_idx, panorama_id = self.panoramas[idx]
         panorama = self.kluster.kluster["street_view"].find_one({"_id": panorama_id})
+        if self.keyword in panorama:  # Escape if this panorama is already predicted (but line was not marked)
+            return segment_id, line_idx, panorama_id, None
         shards = mongo_to_shards(panorama["image_shards"])
         panoramator = Panoramator(shards=shards, atomic_resolution=panorama["resolution"][0] // 16)
         panoramator.build_state()
@@ -76,12 +79,13 @@ def inference(kluster, predictor, data_loader, keyword, upload=True):
             print(f"Finished line {line_count}! (Segment:{sid};Index:{lidx})")
         current_line = (segment_id, line_idx)
 
-        result = []
-        for projection_meta, projection in projections:
-            predictions = predictor(projection)
-            result.append({"projection": projection_meta.get_dict(), **predictions})
-        if upload:
-            kluster.kluster["street_view"].update_one({"_id": panorama_id}, {"$set": {keyword: result}})
+        if projections is not None:  # If the panorama is already predicted, we skip this block
+            result = []
+            for projection_meta, projection in projections:
+                predictions = predictor(projection)
+                result.append({"projection": projection_meta.get_dict(), **predictions})
+            if upload:
+                kluster.kluster["street_view"].update_one({"_id": panorama_id}, {"$set": {keyword: result}})
 
         print(f"Predicted panorama {i + 1}/{len(data_loader)} "
               f"(Time elapsed: {time.time() - itime:.2f}s) ({panorama_id})")
@@ -125,6 +129,9 @@ class ParkinkDatasetMapper:
             dict: a format that builtin models in detectron2 accept
         """
         segment_id, line_idx, panorama_id, projections = parkink_data
+
+        if projections is None:
+            return segment_id, line_idx, panorama_id, None
 
         kitti_projections = []
         for projection_meta, image in projections:
